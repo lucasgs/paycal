@@ -24,3 +24,9 @@ Weekly:  1400
 Monthly: 6066
 Yearly:  72800
 ```
+
+## Test
+
+Run the following to run tests
+
+`cargo test`

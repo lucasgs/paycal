@@ -1,5 +1,7 @@
 use std::env;
 
+mod tests;
+
 #[derive(Debug, Clone, Copy)]
 struct Data {
     rate: f64,
