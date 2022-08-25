@@ -17,4 +17,11 @@ Then clone this repo and execute the following with your parameters:
 `cargo run 20 8`
 
 
+```
+* Results *
+Hourly:  35
+Weekly:  1400
+Monthly: 6066
+Yearly:  72800
 
+```
