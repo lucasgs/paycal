@@ -5,7 +5,7 @@ CLI pay calculator
 
 First, install [Rust](https://www.rust-lang.org/tools/install)
 
-Then clone this repo and execute the following using your own arguments:
+Then clone this repo and execute the following with your parameters:
 
 `cargo run {rate} {hours_by_date}`
 
@@ -16,7 +16,6 @@ Then clone this repo and execute the following using your own arguments:
 
 `cargo run 20 8`
 
-
 ```
 * Results *
 Hourly:  35
@@ -24,9 +23,8 @@ Weekly:  1400
 Monthly: 6066
 Yearly:  72800
 ```
-
 ## Test
 
-Run the following to run tests
+Execute the following to run all the tests
 
 `cargo test`
