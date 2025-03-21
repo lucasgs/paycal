@@ -53,7 +53,7 @@ fn main() {
 fn read_args() -> Data {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.len() != 2 {
-        panic!("incorrect args should be 3: rate days hours_per_day");
+        panic!("incorrect args should be 2: [rate] [hours_per_day]");
     }
     Data {
         rate: args[0].parse().expect("Invalid param rate"),
