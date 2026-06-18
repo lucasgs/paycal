@@ -42,6 +42,13 @@ cargo run -- --rate 20,25 --hours 8 --format csv
 cargo run -- --rate 20,25 --hours 8 --format json
 ```
 
+Write output directly to a file:
+
+```bash
+cargo run -- --rate 20,25 --hours 8 --format csv --output report.csv
+cargo run -- --rate 20,25 --hours 8 --format json --output report.json
+```
+
 Backwards-compatible positional form still works:
 
 ```bash
@@ -116,6 +123,14 @@ cargo run -- --rate 20,25 --hours 8 --format json --currency USD
   ]
 }
 ```
+
+File output example:
+
+```bash
+cargo run -- --rate 20,25 --hours 8 --format csv --output report.csv
+```
+
+This writes the rendered export to `report.csv` instead of stdout.
 
 ## Test
 

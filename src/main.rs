@@ -1,4 +1,4 @@
-use std::process::ExitCode;
+use std::{fs, process::ExitCode};
 
 use paycal::{read_args, usage, CliAction, OutputFormat, PayBreakdown, PayInput, WorkSchedule};
 use rust_decimal::Decimal;
@@ -15,13 +15,21 @@ fn main() -> ExitCode {
             schedule,
             format,
             currency,
+            output,
         }) => {
-            match format {
-                OutputFormat::Table => print_table(&inputs, schedule, currency.as_deref()),
-                OutputFormat::Csv => print_csv(&inputs, schedule, currency.as_deref()),
-                OutputFormat::Json => print_json(&inputs, schedule, currency.as_deref()),
+            let rendered = match format {
+                OutputFormat::Table => render_table(&inputs, schedule, currency.as_deref()),
+                OutputFormat::Csv => render_csv(&inputs, schedule, currency.as_deref()),
+                OutputFormat::Json => render_json(&inputs, schedule, currency.as_deref()),
+            };
+
+            match output_result(output.as_deref(), &rendered) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(message) => {
+                    eprintln!("Error: {message}");
+                    ExitCode::from(1)
+                }
             }
-            ExitCode::SUCCESS
         }
         Err(message) => {
             eprintln!("Error: {message}\n\n{}", usage());
@@ -30,7 +38,18 @@ fn main() -> ExitCode {
     }
 }
 
-fn print_table(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str>) {
+fn output_result(path: Option<&str>, content: &str) -> Result<(), String> {
+    match path {
+        Some(path) => fs::write(path, content)
+            .map_err(|error| format!("failed to write output file '{path}': {error}")),
+        None => {
+            print!("{content}");
+            Ok(())
+        }
+    }
+}
+
+fn render_table(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str>) -> String {
     let headers = ["Rate", "Weekly", "Monthly", "Yearly"];
     let rows: Vec<[String; 4]> = inputs
         .iter()
@@ -46,36 +65,42 @@ fn print_table(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&st
         .collect();
 
     let widths = column_widths(&headers, &rows);
-    print_border(&widths);
-    print_row(headers, &widths);
-    print_border(&widths);
+    let mut output = String::new();
+    push_border(&mut output, &widths);
+    push_row(&mut output, headers, &widths);
+    push_border(&mut output, &widths);
 
     for row in rows {
-        print_row([&row[0], &row[1], &row[2], &row[3]], &widths);
+        push_row(&mut output, [&row[0], &row[1], &row[2], &row[3]], &widths);
     }
 
-    print_border(&widths);
+    push_border(&mut output, &widths);
+    output
 }
 
-fn print_csv(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str>) {
+fn render_csv(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str>) -> String {
+    let mut output = String::new();
+
     if let Some(currency) = currency {
-        println!("currency,{currency}");
+        output.push_str(&format!("currency,{currency}\n"));
     }
-    println!("rate,weekly,monthly,yearly");
+    output.push_str("rate,weekly,monthly,yearly\n");
 
     for input in inputs {
         let result = input.calculate_with_schedule(schedule);
-        println!(
-            "{},{},{},{}",
+        output.push_str(&format!(
+            "{},{},{},{}\n",
             format_money(input.rate, currency),
             format_money(result.weekly, currency),
             format_money(result.monthly, currency),
             format_money(result.yearly, currency),
-        );
+        ));
     }
+
+    output
 }
 
-fn print_json(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str>) {
+fn render_json(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str>) -> String {
     let rows: Vec<JsonRow> = inputs
         .iter()
         .map(|input| {
@@ -90,10 +115,10 @@ fn print_json(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str
         results: rows,
     };
 
-    println!(
-        "{}",
+    format!(
+        "{}\n",
         serde_json::to_string_pretty(&payload).expect("json serialization should succeed")
-    );
+    )
 }
 
 fn format_money(value: Decimal, currency: Option<&str>) -> String {
@@ -118,19 +143,19 @@ fn column_widths(headers: &[&str; 4], rows: &[[String; 4]]) -> [usize; 4] {
     widths
 }
 
-fn print_border(widths: &[usize; 4]) {
-    println!(
-        "+-{}-+-{}-+-{}-+-{}-+",
+fn push_border(output: &mut String, widths: &[usize; 4]) {
+    output.push_str(&format!(
+        "+-{}-+-{}-+-{}-+-{}-+\n",
         "-".repeat(widths[0]),
         "-".repeat(widths[1]),
         "-".repeat(widths[2]),
         "-".repeat(widths[3]),
-    );
+    ));
 }
 
-fn print_row(values: [&str; 4], widths: &[usize; 4]) {
-    println!(
-        "| {:>width0$} | {:>width1$} | {:>width2$} | {:>width3$} |",
+fn push_row(output: &mut String, values: [&str; 4], widths: &[usize; 4]) {
+    output.push_str(&format!(
+        "| {:>width0$} | {:>width1$} | {:>width2$} | {:>width3$} |\n",
         values[0],
         values[1],
         values[2],
@@ -139,7 +164,7 @@ fn print_row(values: [&str; 4], widths: &[usize; 4]) {
         width1 = widths[1],
         width2 = widths[2],
         width3 = widths[3],
-    );
+    ));
 }
 
 #[derive(Serialize)]

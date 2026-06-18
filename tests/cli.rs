@@ -1,10 +1,25 @@
-use std::process::Command;
+use std::{
+    env, fs,
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 fn run_paycal(args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_paycal"))
         .args(args)
         .output()
         .expect("failed to run paycal")
+}
+
+fn temp_output_path(extension: &str) -> String {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("time should move forward")
+        .as_nanos();
+    env::temp_dir()
+        .join(format!("paycal_test_{timestamp}.{extension}"))
+        .to_string_lossy()
+        .into_owned()
 }
 
 #[test]
@@ -15,10 +30,13 @@ fn help_output_succeeds() {
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
     assert!(stdout.contains("Usage: paycal [OPTIONS]"));
-    assert!(stdout.contains("--rate <RATE[,RATE...]>"));
+    assert!(
+        stdout.contains("--rate <RATE[,RATE...] >") || stdout.contains("--rate <RATE[,RATE...]>")
+    );
     assert!(stdout.contains("--hours <HOURS_PER_DAY>"));
     assert!(stdout.contains("--format <FORMAT>"));
     assert!(stdout.contains("--currency <CURRENCY>"));
+    assert!(stdout.contains("--output <FILE>"));
 }
 
 #[test]
@@ -130,6 +148,23 @@ fn json_export_with_currency_works() {
     assert!(stdout.contains("\"currency\": \"USD\""));
     assert!(stdout.contains("\"rate\": \"USD 20.00\""));
     assert!(stdout.contains("\"yearly\": \"USD 52000.00\""));
+}
+
+#[test]
+fn output_file_writes_csv_and_suppresses_stdout() {
+    let path = temp_output_path("csv");
+    let output = run_paycal(&[
+        "--rate", "20,25", "--hours", "8", "--format", "csv", "--output", &path,
+    ]);
+
+    assert!(output.status.success());
+    assert!(output.stdout.is_empty());
+
+    let written = fs::read_to_string(&path).expect("output file should exist");
+    assert!(written.contains("rate,weekly,monthly,yearly"));
+    assert!(written.contains("20.00,800.00,3466.67,41600.00"));
+
+    let _ = fs::remove_file(path);
 }
 
 #[test]

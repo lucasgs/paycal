@@ -29,6 +29,8 @@ struct CliArgs {
     format: OutputFormat,
     #[arg(long, value_name = "CURRENCY")]
     currency: Option<String>,
+    #[arg(long, value_name = "FILE")]
+    output: Option<String>,
     #[arg(
         long = "days-per-week",
         value_name = "DAYS",
@@ -71,6 +73,7 @@ pub enum CliAction {
         schedule: WorkSchedule,
         format: OutputFormat,
         currency: Option<String>,
+        output: Option<String>,
     },
 }
 
@@ -133,6 +136,11 @@ where
         return Err("currency must not be empty".to_string());
     }
 
+    let output = parsed.output.map(|value| value.trim().to_string());
+    if matches!(output.as_deref(), Some("")) {
+        return Err("output must not be empty".to_string());
+    }
+
     let inputs = rates
         .into_iter()
         .map(|rate| PayInput {
@@ -150,6 +158,7 @@ where
         },
         format: parsed.format,
         currency,
+        output,
     })
 }
 
@@ -287,6 +296,7 @@ mod tests {
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Table,
                 currency: None,
+                output: None,
             }
         );
     }
@@ -319,6 +329,7 @@ mod tests {
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Table,
                 currency: Some("USD".to_string()),
+                output: None,
             }
         );
     }
@@ -351,6 +362,40 @@ mod tests {
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Csv,
                 currency: None,
+                output: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_accepts_output_path() {
+        let action = parse_args([
+            "--rate".to_string(),
+            "20,25".to_string(),
+            "--hours".to_string(),
+            "8".to_string(),
+            "--output".to_string(),
+            "report.csv".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            action,
+            CliAction::Calculate {
+                inputs: vec![
+                    PayInput {
+                        rate: dec!(20.0),
+                        hours_per_day: 8,
+                    },
+                    PayInput {
+                        rate: dec!(25.0),
+                        hours_per_day: 8,
+                    },
+                ],
+                schedule: WorkSchedule::default(),
+                format: OutputFormat::Table,
+                currency: None,
+                output: Some("report.csv".to_string()),
             }
         );
     }
@@ -391,6 +436,7 @@ mod tests {
                 },
                 format: OutputFormat::Table,
                 currency: None,
+                output: None,
             }
         );
     }
@@ -426,6 +472,7 @@ mod tests {
                 },
                 format: OutputFormat::Table,
                 currency: None,
+                output: None,
             }
         );
     }
@@ -500,6 +547,7 @@ mod tests {
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Json,
                 currency: None,
+                output: None,
             }
         );
     }
