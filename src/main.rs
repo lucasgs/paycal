@@ -1,6 +1,7 @@
 use std::process::ExitCode;
 
 use paycal::{read_args, CliAction, USAGE};
+use rust_decimal::Decimal;
 
 fn main() -> ExitCode {
     match read_args() {
@@ -11,10 +12,10 @@ fn main() -> ExitCode {
         Ok(CliAction::Calculate { input, schedule }) => {
             let result = input.calculate_with_schedule(schedule);
             println!("* Results *");
-            println!("Hourly:  {:.2}", result.hourly);
-            println!("Weekly:  {:.2}", result.weekly);
-            println!("Monthly: {:.2}", result.monthly);
-            println!("Yearly:  {:.2}", result.yearly);
+            println!("Hourly:  {}", format_money(result.hourly));
+            println!("Weekly:  {}", format_money(result.weekly));
+            println!("Monthly: {}", format_money(result.monthly));
+            println!("Yearly:  {}", format_money(result.yearly));
             ExitCode::SUCCESS
         }
         Err(message) => {
@@ -22,4 +23,8 @@ fn main() -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+fn format_money(value: Decimal) -> String {
+    format!("{:.2}", value.round_dp(2))
 }

@@ -1,5 +1,7 @@
 use std::env;
 
+use rust_decimal::Decimal;
+
 use crate::{PayInput, WorkSchedule};
 
 pub const USAGE: &str = "paycal - CLI pay calculator\n\nUsage:\n  paycal <rate> <hours_per_day> [days_per_week] [weeks_per_year] [months_per_year]\n  paycal --help\n\nArguments:\n  <rate>             Hourly pay rate (must be non-negative)\n  <hours_per_day>    Hours worked per day (must be between 0 and 24)\n  [days_per_week]    Optional work days per week (must be greater than 0)\n  [weeks_per_year]   Optional work weeks per year (must be greater than 0)\n  [months_per_year]  Optional months per year (must be greater than 0)\n\nExamples:\n  paycal 20 8\n  paycal 20 8 4 48 12\n  cargo run -- 20 8 4 48 12";
@@ -35,13 +37,8 @@ where
         );
     }
 
-    let rate: f64 = args[0]
-        .parse()
-        .map_err(|_| "rate must be a valid number".to_string())?;
-    if !rate.is_finite() {
-        return Err("rate must be a finite number".to_string());
-    }
-    if rate < 0.0 {
+    let rate = parse_decimal(&args[0], "rate")?;
+    if rate < Decimal::ZERO {
         return Err("rate must be non-negative".to_string());
     }
 
@@ -53,9 +50,12 @@ where
     }
 
     let schedule = WorkSchedule {
-        days_per_week: parse_positive_f64(args.get(2), "days_per_week")?.unwrap_or(5.0),
-        weeks_per_year: parse_positive_f64(args.get(3), "weeks_per_year")?.unwrap_or(52.0),
-        months_per_year: parse_positive_f64(args.get(4), "months_per_year")?.unwrap_or(12.0),
+        days_per_week: parse_positive_decimal(args.get(2), "days_per_week")?
+            .unwrap_or(Decimal::from(5)),
+        weeks_per_year: parse_positive_decimal(args.get(3), "weeks_per_year")?
+            .unwrap_or(Decimal::from(52)),
+        months_per_year: parse_positive_decimal(args.get(4), "months_per_year")?
+            .unwrap_or(Decimal::from(12)),
     };
 
     Ok(CliAction::Calculate {
@@ -67,19 +67,19 @@ where
     })
 }
 
-fn parse_positive_f64(value: Option<&String>, name: &str) -> Result<Option<f64>, String> {
+fn parse_decimal(value: &str, name: &str) -> Result<Decimal, String> {
+    value
+        .parse()
+        .map_err(|_| format!("{name} must be a valid number"))
+}
+
+fn parse_positive_decimal(value: Option<&String>, name: &str) -> Result<Option<Decimal>, String> {
     let Some(value) = value else {
         return Ok(None);
     };
 
-    let parsed: f64 = value
-        .parse()
-        .map_err(|_| format!("{name} must be a valid number"))?;
-
-    if !parsed.is_finite() {
-        return Err(format!("{name} must be a finite number"));
-    }
-    if parsed <= 0.0 {
+    let parsed = parse_decimal(value, name)?;
+    if parsed <= Decimal::ZERO {
         return Err(format!("{name} must be greater than 0"));
     }
 
@@ -88,6 +88,8 @@ fn parse_positive_f64(value: Option<&String>, name: &str) -> Result<Option<f64>,
 
 #[cfg(test)]
 mod tests {
+    use rust_decimal_macros::dec;
+
     use super::{parse_args, CliAction};
     use crate::{PayInput, WorkSchedule};
 
@@ -138,7 +140,7 @@ mod tests {
             action,
             CliAction::Calculate {
                 input: PayInput {
-                    rate: 20.0,
+                    rate: dec!(20.0),
                     hours_per_day: 8,
                 },
                 schedule: WorkSchedule::default(),
@@ -161,13 +163,13 @@ mod tests {
             action,
             CliAction::Calculate {
                 input: PayInput {
-                    rate: 20.0,
+                    rate: dec!(20.0),
                     hours_per_day: 8,
                 },
                 schedule: WorkSchedule {
-                    days_per_week: 4.0,
-                    weeks_per_year: 48.0,
-                    months_per_year: 12.0,
+                    days_per_week: dec!(4.0),
+                    weeks_per_year: dec!(48.0),
+                    months_per_year: dec!(12.0),
                 },
             }
         );
