@@ -8,8 +8,8 @@ fn main() -> ExitCode {
             println!("{USAGE}");
             ExitCode::SUCCESS
         }
-        Ok(CliAction::Calculate(input)) => {
-            let result = input.calculate();
+        Ok(CliAction::Calculate { input, schedule }) => {
+            let result = input.calculate_with_schedule(schedule);
             println!("* Results *");
             println!("Hourly:  {:.2}", result.hourly);
             println!("Weekly:  {:.2}", result.weekly);

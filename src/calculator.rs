@@ -5,21 +5,42 @@ pub struct PayInput {
     pub hours_per_day: u8,
 }
 
-impl PayInput {
-    /// Calculates hourly, weekly, monthly, and yearly pay using
-    /// 5 work days per week, 52 weeks per year, and 12 months per year.
-    pub fn calculate(self) -> PayBreakdown {
-        let days_per_week = 5.0;
-        let hours_per_week = f64::from(self.hours_per_day) * days_per_week;
+/// Configurable schedule assumptions used in pay calculations.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WorkSchedule {
+    pub days_per_week: f64,
+    pub weeks_per_year: f64,
+    pub months_per_year: f64,
+}
 
-        let weeks_per_year = 52.0;
-        let months_per_year = 12.0;
-        let weeks_per_month = weeks_per_year / months_per_year;
+impl Default for WorkSchedule {
+    fn default() -> Self {
+        Self {
+            days_per_week: 5.0,
+            weeks_per_year: 52.0,
+            months_per_year: 12.0,
+        }
+    }
+}
+
+impl PayInput {
+    /// Calculates hourly, weekly, monthly, and yearly pay using the default
+    /// schedule assumptions of 5 work days per week, 52 weeks per year,
+    /// and 12 months per year.
+    pub fn calculate(self) -> PayBreakdown {
+        self.calculate_with_schedule(WorkSchedule::default())
+    }
+
+    /// Calculates hourly, weekly, monthly, and yearly pay using a caller-
+    /// provided work schedule.
+    pub fn calculate_with_schedule(self, schedule: WorkSchedule) -> PayBreakdown {
+        let hours_per_week = f64::from(self.hours_per_day) * schedule.days_per_week;
+        let weeks_per_month = schedule.weeks_per_year / schedule.months_per_year;
 
         let hourly = self.rate;
         let monthly = self.rate * hours_per_week * weeks_per_month;
         let weekly = monthly / weeks_per_month;
-        let yearly = monthly * months_per_year;
+        let yearly = monthly * schedule.months_per_year;
 
         PayBreakdown {
             hourly,
@@ -41,7 +62,7 @@ pub struct PayBreakdown {
 
 #[cfg(test)]
 mod tests {
-    use super::PayInput;
+    use super::{PayInput, WorkSchedule};
 
     #[test]
     fn calculate_round_case() {
@@ -101,5 +122,24 @@ mod tests {
         assert_eq!(res.weekly, 0.0);
         assert_eq!(res.monthly, 0.0);
         assert_eq!(res.yearly, 0.0);
+    }
+
+    #[test]
+    fn calculate_with_custom_schedule() {
+        let data = PayInput {
+            rate: 20.0,
+            hours_per_day: 8,
+        };
+
+        let res = data.calculate_with_schedule(WorkSchedule {
+            days_per_week: 4.0,
+            weeks_per_year: 48.0,
+            months_per_year: 12.0,
+        });
+
+        assert_eq!(res.hourly, 20.0);
+        assert_eq!(res.weekly, 640.0);
+        assert_eq!(res.monthly, 2560.0);
+        assert_eq!(res.yearly, 30720.0);
     }
 }
