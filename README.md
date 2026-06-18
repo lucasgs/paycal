@@ -22,6 +22,13 @@ Multi-rate with shared hours:
 cargo run -- --rate 20,25,30 --hours 8
 ```
 
+Sort comparison rows:
+
+```bash
+cargo run -- --rate 25,20,30 --hours 8 --sort yearly
+cargo run -- --rate 25,20,30 --hours 8 --sort rate
+```
+
 Add an optional currency label or symbol:
 
 ```bash
@@ -65,38 +72,39 @@ cargo run -- --help
 
 ## Examples
 
-Table output:
+Sorted table output:
 
 ```bash
-cargo run -- --rate 20,25 --hours 8 --currency USD
+cargo run -- --rate 25,20,30 --hours 8 --sort yearly
 ```
 
 ```text
-+-----------+-------------+-------------+--------------+
-|      Rate |      Weekly |     Monthly |       Yearly |
-+-----------+-------------+-------------+--------------+
-| USD 20.00 |  USD 800.00 | USD 3466.67 | USD 41600.00 |
-| USD 25.00 | USD 1000.00 | USD 4333.33 | USD 52000.00 |
-+-----------+-------------+-------------+--------------+
++-------+---------+---------+----------+
+|  Rate |  Weekly | Monthly |   Yearly |
++-------+---------+---------+----------+
+| 20.00 |  800.00 | 3466.67 | 41600.00 |
+| 25.00 | 1000.00 | 4333.33 | 52000.00 |
+| 30.00 | 1200.00 | 5200.00 | 62400.00 |
++-------+---------+---------+----------+
 ```
 
-CSV output:
+CSV output with sort metadata:
 
 ```bash
-cargo run -- --rate 20,25 --hours 8 --format csv --currency USD
+cargo run -- --rate 25,20 --hours 8 --format csv --sort rate
 ```
 
 ```text
-currency,USD
+sort,rate
 rate,weekly,monthly,yearly
-USD 20.00,USD 800.00,USD 3466.67,USD 41600.00
-USD 25.00,USD 1000.00,USD 4333.33,USD 52000.00
+20.00,800.00,3466.67,41600.00
+25.00,1000.00,4333.33,52000.00
 ```
 
-JSON output:
+JSON output with sort metadata:
 
 ```bash
-cargo run -- --rate 20,25 --hours 8 --format json --currency USD
+cargo run -- --rate 25,20 --hours 8 --format json --sort yearly
 ```
 
 ```json
@@ -106,31 +114,23 @@ cargo run -- --rate 20,25 --hours 8 --format json --currency USD
     "weeks_per_year": "52.00",
     "months_per_year": "12.00"
   },
-  "currency": "USD",
+  "sort": "yearly",
   "results": [
     {
-      "rate": "USD 20.00",
-      "weekly": "USD 800.00",
-      "monthly": "USD 3466.67",
-      "yearly": "USD 41600.00"
+      "rate": "20.00",
+      "weekly": "800.00",
+      "monthly": "3466.67",
+      "yearly": "41600.00"
     },
     {
-      "rate": "USD 25.00",
-      "weekly": "USD 1000.00",
-      "monthly": "USD 4333.33",
-      "yearly": "USD 52000.00"
+      "rate": "25.00",
+      "weekly": "1000.00",
+      "monthly": "4333.33",
+      "yearly": "52000.00"
     }
   ]
 }
 ```
-
-File output example:
-
-```bash
-cargo run -- --rate 20,25 --hours 8 --format csv --output report.csv
-```
-
-This writes the rendered export to `report.csv` instead of stdout.
 
 ## Test
 

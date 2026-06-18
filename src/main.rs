@@ -1,6 +1,8 @@
-use std::{fs, process::ExitCode};
+use std::{cmp::Ordering, fs, process::ExitCode};
 
-use paycal::{read_args, usage, CliAction, OutputFormat, PayBreakdown, PayInput, WorkSchedule};
+use paycal::{
+    read_args, usage, CliAction, OutputFormat, PayBreakdown, PayInput, SortBy, WorkSchedule,
+};
 use rust_decimal::Decimal;
 use serde::Serialize;
 
@@ -16,11 +18,12 @@ fn main() -> ExitCode {
             format,
             currency,
             output,
+            sort,
         }) => {
             let rendered = match format {
-                OutputFormat::Table => render_table(&inputs, schedule, currency.as_deref()),
-                OutputFormat::Csv => render_csv(&inputs, schedule, currency.as_deref()),
-                OutputFormat::Json => render_json(&inputs, schedule, currency.as_deref()),
+                OutputFormat::Table => render_table(&inputs, schedule, currency.as_deref(), sort),
+                OutputFormat::Csv => render_csv(&inputs, schedule, currency.as_deref(), sort),
+                OutputFormat::Json => render_json(&inputs, schedule, currency.as_deref(), sort),
             };
 
             match output_result(output.as_deref(), &rendered) {
@@ -49,12 +52,17 @@ fn output_result(path: Option<&str>, content: &str) -> Result<(), String> {
     }
 }
 
-fn render_table(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str>) -> String {
+fn render_table(
+    inputs: &[PayInput],
+    schedule: WorkSchedule,
+    currency: Option<&str>,
+    sort: Option<SortBy>,
+) -> String {
     let headers = ["Rate", "Weekly", "Monthly", "Yearly"];
-    let rows: Vec<[String; 4]> = inputs
+    let sorted_inputs = sorted_inputs(inputs, schedule, sort);
+    let rows: Vec<[String; 4]> = sorted_inputs
         .iter()
-        .map(|input| {
-            let result = input.calculate_with_schedule(schedule);
+        .map(|(input, result)| {
             [
                 format_money(input.rate, currency),
                 format_money(result.weekly, currency),
@@ -78,16 +86,24 @@ fn render_table(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&s
     output
 }
 
-fn render_csv(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str>) -> String {
+fn render_csv(
+    inputs: &[PayInput],
+    schedule: WorkSchedule,
+    currency: Option<&str>,
+    sort: Option<SortBy>,
+) -> String {
     let mut output = String::new();
+    let sorted_inputs = sorted_inputs(inputs, schedule, sort);
 
     if let Some(currency) = currency {
         output.push_str(&format!("currency,{currency}\n"));
     }
+    if let Some(sort) = sort {
+        output.push_str(&format!("sort,{}\n", sort_label(sort)));
+    }
     output.push_str("rate,weekly,monthly,yearly\n");
 
-    for input in inputs {
-        let result = input.calculate_with_schedule(schedule);
+    for (input, result) in sorted_inputs {
         output.push_str(&format!(
             "{},{},{},{}\n",
             format_money(input.rate, currency),
@@ -100,18 +116,22 @@ fn render_csv(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str
     output
 }
 
-fn render_json(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&str>) -> String {
-    let rows: Vec<JsonRow> = inputs
-        .iter()
-        .map(|input| {
-            let result = input.calculate_with_schedule(schedule);
-            JsonRow::from(*input, result, currency)
-        })
+fn render_json(
+    inputs: &[PayInput],
+    schedule: WorkSchedule,
+    currency: Option<&str>,
+    sort: Option<SortBy>,
+) -> String {
+    let sorted_inputs = sorted_inputs(inputs, schedule, sort);
+    let rows: Vec<JsonRow> = sorted_inputs
+        .into_iter()
+        .map(|(input, result)| JsonRow::from(input, result, currency))
         .collect();
 
     let payload = JsonExport {
         schedule: JsonSchedule::from(schedule),
         currency: currency.map(str::to_string),
+        sort: sort.map(sort_label),
         results: rows,
     };
 
@@ -119,6 +139,49 @@ fn render_json(inputs: &[PayInput], schedule: WorkSchedule, currency: Option<&st
         "{}\n",
         serde_json::to_string_pretty(&payload).expect("json serialization should succeed")
     )
+}
+
+fn sorted_inputs(
+    inputs: &[PayInput],
+    schedule: WorkSchedule,
+    sort: Option<SortBy>,
+) -> Vec<(PayInput, PayBreakdown)> {
+    let mut rows: Vec<(PayInput, PayBreakdown)> = inputs
+        .iter()
+        .copied()
+        .map(|input| (input, input.calculate_with_schedule(schedule)))
+        .collect();
+
+    if let Some(sort) = sort {
+        rows.sort_by(|left, right| compare_rows(left, right, sort));
+    }
+
+    rows
+}
+
+fn compare_rows(
+    left: &(PayInput, PayBreakdown),
+    right: &(PayInput, PayBreakdown),
+    sort: SortBy,
+) -> Ordering {
+    let primary = match sort {
+        SortBy::Rate => left.0.rate.cmp(&right.0.rate),
+        SortBy::Weekly => left.1.weekly.cmp(&right.1.weekly),
+        SortBy::Monthly => left.1.monthly.cmp(&right.1.monthly),
+        SortBy::Yearly => left.1.yearly.cmp(&right.1.yearly),
+    };
+
+    primary.then_with(|| left.0.rate.cmp(&right.0.rate))
+}
+
+fn sort_label(sort: SortBy) -> String {
+    match sort {
+        SortBy::Rate => "rate",
+        SortBy::Weekly => "weekly",
+        SortBy::Monthly => "monthly",
+        SortBy::Yearly => "yearly",
+    }
+    .to_string()
 }
 
 fn format_money(value: Decimal, currency: Option<&str>) -> String {
@@ -172,6 +235,8 @@ struct JsonExport {
     schedule: JsonSchedule,
     #[serde(skip_serializing_if = "Option::is_none")]
     currency: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sort: Option<String>,
     results: Vec<JsonRow>,
 }
 

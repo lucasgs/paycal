@@ -12,13 +12,21 @@ pub enum OutputFormat {
     Json,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum SortBy {
+    Rate,
+    Weekly,
+    Monthly,
+    Yearly,
+}
+
 #[derive(Debug, Clone, PartialEq, Parser)]
 #[command(
     name = "paycal",
     version,
     about = "CLI pay calculator",
     long_about = None,
-    after_help = "Examples:\n  paycal --rate 20 --hours 8\n  paycal --rate 20,25,30 --hours 8\n  paycal --rate 20,25 --hours 8 --currency USD\n  paycal --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12\n  paycal --rate 20,25 --hours 8 --format csv\n  paycal --rate 20,25 --hours 8 --format json\n  paycal 20,25 8\n  cargo run -- --rate 20,25,30 --hours 8"
+    after_help = "Examples:\n  paycal --rate 20 --hours 8\n  paycal --rate 20,25,30 --hours 8\n  paycal --rate 20,25 --hours 8 --currency USD\n  paycal --rate 20,25 --hours 8 --sort yearly\n  paycal --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12\n  paycal --rate 20,25 --hours 8 --format csv\n  paycal --rate 20,25 --hours 8 --format json\n  paycal 20,25 8\n  cargo run -- --rate 20,25,30 --hours 8"
 )]
 struct CliArgs {
     #[arg(long, value_name = "RATE[,RATE...]", allow_hyphen_values = true)]
@@ -31,6 +39,8 @@ struct CliArgs {
     currency: Option<String>,
     #[arg(long, value_name = "FILE")]
     output: Option<String>,
+    #[arg(long, value_enum, value_name = "FIELD")]
+    sort: Option<SortBy>,
     #[arg(
         long = "days-per-week",
         value_name = "DAYS",
@@ -74,6 +84,7 @@ pub enum CliAction {
         format: OutputFormat,
         currency: Option<String>,
         output: Option<String>,
+        sort: Option<SortBy>,
     },
 }
 
@@ -159,6 +170,7 @@ where
         format: parsed.format,
         currency,
         output,
+        sort: parsed.sort,
     })
 }
 
@@ -194,7 +206,7 @@ fn validate_positive_decimal(value: Decimal, name: &str) -> Result<(), String> {
 mod tests {
     use rust_decimal_macros::dec;
 
-    use super::{parse_args, CliAction, OutputFormat};
+    use super::{parse_args, CliAction, OutputFormat, SortBy};
     use crate::{PayInput, WorkSchedule};
 
     #[test]
@@ -297,6 +309,7 @@ mod tests {
                 format: OutputFormat::Table,
                 currency: None,
                 output: None,
+                sort: None,
             }
         );
     }
@@ -330,6 +343,7 @@ mod tests {
                 format: OutputFormat::Table,
                 currency: Some("USD".to_string()),
                 output: None,
+                sort: None,
             }
         );
     }
@@ -363,6 +377,7 @@ mod tests {
                 format: OutputFormat::Csv,
                 currency: None,
                 output: None,
+                sort: None,
             }
         );
     }
@@ -396,6 +411,41 @@ mod tests {
                 format: OutputFormat::Table,
                 currency: None,
                 output: Some("report.csv".to_string()),
+                sort: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_accepts_sort_field() {
+        let action = parse_args([
+            "--rate".to_string(),
+            "20,25".to_string(),
+            "--hours".to_string(),
+            "8".to_string(),
+            "--sort".to_string(),
+            "yearly".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            action,
+            CliAction::Calculate {
+                inputs: vec![
+                    PayInput {
+                        rate: dec!(20.0),
+                        hours_per_day: 8,
+                    },
+                    PayInput {
+                        rate: dec!(25.0),
+                        hours_per_day: 8,
+                    },
+                ],
+                schedule: WorkSchedule::default(),
+                format: OutputFormat::Table,
+                currency: None,
+                output: None,
+                sort: Some(SortBy::Yearly),
             }
         );
     }
@@ -437,6 +487,7 @@ mod tests {
                 format: OutputFormat::Table,
                 currency: None,
                 output: None,
+                sort: None,
             }
         );
     }
@@ -473,6 +524,7 @@ mod tests {
                 format: OutputFormat::Table,
                 currency: None,
                 output: None,
+                sort: None,
             }
         );
     }
@@ -548,6 +600,7 @@ mod tests {
                 format: OutputFormat::Json,
                 currency: None,
                 output: None,
+                sort: None,
             }
         );
     }

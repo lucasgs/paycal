@@ -37,6 +37,7 @@ fn help_output_succeeds() {
     assert!(stdout.contains("--format <FORMAT>"));
     assert!(stdout.contains("--currency <CURRENCY>"));
     assert!(stdout.contains("--output <FILE>"));
+    assert!(stdout.contains("--sort <FIELD>"));
 }
 
 #[test]
@@ -52,6 +53,19 @@ fn named_args_render_expected_table() {
     assert!(stdout.contains("Yearly"));
     assert!(stdout.contains("| 20.00 | 800.00 | 3466.67 | 41600.00 |"));
     assert!(!stdout.contains("Hourly"));
+}
+
+#[test]
+fn sorting_by_yearly_reorders_rows() {
+    let output = run_paycal(&["--rate", "25,20,30", "--hours", "8", "--sort", "yearly"]);
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
+    let twenty = stdout.find("20.00 |  800.00 | 3466.67 | 41600.00").unwrap();
+    let twenty_five = stdout.find("25.00 | 1000.00 | 4333.33 | 52000.00").unwrap();
+    let thirty = stdout.find("30.00 | 1200.00 | 5200.00 | 62400.00").unwrap();
+    assert!(twenty < twenty_five && twenty_five < thirty);
 }
 
 #[test]
@@ -96,6 +110,21 @@ fn csv_export_works() {
 }
 
 #[test]
+fn csv_export_includes_sort_metadata() {
+    let output = run_paycal(&[
+        "--rate", "25,20", "--hours", "8", "--format", "csv", "--sort", "rate",
+    ]);
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
+    assert!(stdout.contains("sort,rate"));
+    let twenty = stdout.find("20.00,800.00,3466.67,41600.00").unwrap();
+    let twenty_five = stdout.find("25.00,1000.00,4333.33,52000.00").unwrap();
+    assert!(twenty < twenty_five);
+}
+
+#[test]
 fn csv_export_with_currency_works() {
     let output = run_paycal(&[
         "--rate",
@@ -127,6 +156,21 @@ fn json_export_works() {
     assert!(stdout.contains("\"rate\": \"20.00\""));
     assert!(stdout.contains("\"yearly\": \"52000.00\""));
     assert!(!stdout.contains("\"hourly\""));
+}
+
+#[test]
+fn json_export_includes_sort_metadata() {
+    let output = run_paycal(&[
+        "--rate", "25,20", "--hours", "8", "--format", "json", "--sort", "yearly",
+    ]);
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
+    assert!(stdout.contains("\"sort\": \"yearly\""));
+    let twenty = stdout.find("\"rate\": \"20.00\"").unwrap();
+    let twenty_five = stdout.find("\"rate\": \"25.00\"").unwrap();
+    assert!(twenty < twenty_five);
 }
 
 #[test]
