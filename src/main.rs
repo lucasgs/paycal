@@ -1,4 +1,9 @@
-use std::{cmp::Ordering, fs, process::ExitCode};
+use std::{
+    cmp::Ordering,
+    fs,
+    process::ExitCode,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use paycal::{
     read_args, usage, CliAction, OutputFormat, PayBreakdown, PayInput, SortBy, WorkSchedule,
@@ -20,10 +25,23 @@ fn main() -> ExitCode {
             output,
             sort,
         }) => {
+            let generated_at_unix_seconds = current_unix_timestamp();
             let rendered = match format {
                 OutputFormat::Table => render_table(&inputs, schedule, currency.as_deref(), sort),
-                OutputFormat::Csv => render_csv(&inputs, schedule, currency.as_deref(), sort),
-                OutputFormat::Json => render_json(&inputs, schedule, currency.as_deref(), sort),
+                OutputFormat::Csv => render_csv(
+                    &inputs,
+                    schedule,
+                    currency.as_deref(),
+                    sort,
+                    generated_at_unix_seconds,
+                ),
+                OutputFormat::Json => render_json(
+                    &inputs,
+                    schedule,
+                    currency.as_deref(),
+                    sort,
+                    generated_at_unix_seconds,
+                ),
             };
 
             match output_result(output.as_deref(), &rendered) {
@@ -91,14 +109,41 @@ fn render_csv(
     schedule: WorkSchedule,
     currency: Option<&str>,
     sort: Option<SortBy>,
+    generated_at_unix_seconds: u64,
 ) -> String {
     let mut output = String::new();
     let sorted_inputs = sorted_inputs(inputs, schedule, sort);
+    let metadata = ExportMetadata::new(
+        inputs,
+        schedule,
+        OutputFormat::Csv,
+        currency,
+        sort,
+        generated_at_unix_seconds,
+    );
 
-    if let Some(currency) = currency {
+    output.push_str(&format!("format,{}\n", format_label(metadata.format)));
+    output.push_str(&format!("hours_per_day,{}\n", metadata.hours_per_day));
+    output.push_str(&format!(
+        "days_per_week,{}\n",
+        format_money(schedule.days_per_week, None)
+    ));
+    output.push_str(&format!(
+        "weeks_per_year,{}\n",
+        format_money(schedule.weeks_per_year, None)
+    ));
+    output.push_str(&format!(
+        "months_per_year,{}\n",
+        format_money(schedule.months_per_year, None)
+    ));
+    output.push_str(&format!(
+        "generated_at_unix_seconds,{}\n",
+        metadata.generated_at_unix_seconds
+    ));
+    if let Some(currency) = metadata.currency {
         output.push_str(&format!("currency,{currency}\n"));
     }
-    if let Some(sort) = sort {
+    if let Some(sort) = metadata.sort {
         output.push_str(&format!("sort,{}\n", sort_label(sort)));
     }
     output.push_str("rate,weekly,monthly,yearly\n");
@@ -121,17 +166,25 @@ fn render_json(
     schedule: WorkSchedule,
     currency: Option<&str>,
     sort: Option<SortBy>,
+    generated_at_unix_seconds: u64,
 ) -> String {
     let sorted_inputs = sorted_inputs(inputs, schedule, sort);
     let rows: Vec<JsonRow> = sorted_inputs
         .into_iter()
         .map(|(input, result)| JsonRow::from(input, result, currency))
         .collect();
+    let metadata = ExportMetadata::new(
+        inputs,
+        schedule,
+        OutputFormat::Json,
+        currency,
+        sort,
+        generated_at_unix_seconds,
+    );
 
     let payload = JsonExport {
+        metadata: JsonMetadata::from(metadata),
         schedule: JsonSchedule::from(schedule),
-        currency: currency.map(str::to_string),
-        sort: sort.map(sort_label),
         results: rows,
     };
 
@@ -174,6 +227,13 @@ fn compare_rows(
     primary.then_with(|| left.0.rate.cmp(&right.0.rate))
 }
 
+fn current_unix_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after unix epoch")
+        .as_secs()
+}
+
 fn sort_label(sort: SortBy) -> String {
     match sort {
         SortBy::Rate => "rate",
@@ -182,6 +242,14 @@ fn sort_label(sort: SortBy) -> String {
         SortBy::Yearly => "yearly",
     }
     .to_string()
+}
+
+fn format_label(format: OutputFormat) -> &'static str {
+    match format {
+        OutputFormat::Table => "table",
+        OutputFormat::Csv => "csv",
+        OutputFormat::Json => "json",
+    }
 }
 
 fn format_money(value: Decimal, currency: Option<&str>) -> String {
@@ -230,14 +298,62 @@ fn push_row(output: &mut String, values: [&str; 4], widths: &[usize; 4]) {
     ));
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ExportMetadata<'a> {
+    format: OutputFormat,
+    hours_per_day: u8,
+    currency: Option<&'a str>,
+    sort: Option<SortBy>,
+    generated_at_unix_seconds: u64,
+}
+
+impl<'a> ExportMetadata<'a> {
+    fn new(
+        inputs: &[PayInput],
+        _schedule: WorkSchedule,
+        format: OutputFormat,
+        currency: Option<&'a str>,
+        sort: Option<SortBy>,
+        generated_at_unix_seconds: u64,
+    ) -> Self {
+        Self {
+            format,
+            hours_per_day: inputs.first().map_or(0, |input| input.hours_per_day),
+            currency,
+            sort,
+            generated_at_unix_seconds,
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct JsonExport {
+    metadata: JsonMetadata,
     schedule: JsonSchedule,
+    results: Vec<JsonRow>,
+}
+
+#[derive(Serialize)]
+struct JsonMetadata {
+    format: String,
+    hours_per_day: u8,
+    generated_at_unix_seconds: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     currency: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sort: Option<String>,
-    results: Vec<JsonRow>,
+}
+
+impl<'a> From<ExportMetadata<'a>> for JsonMetadata {
+    fn from(metadata: ExportMetadata<'a>) -> Self {
+        Self {
+            format: format_label(metadata.format).to_string(),
+            hours_per_day: metadata.hours_per_day,
+            generated_at_unix_seconds: metadata.generated_at_unix_seconds,
+            currency: metadata.currency.map(str::to_string),
+            sort: metadata.sort.map(sort_label),
+        }
+    }
 }
 
 #[derive(Serialize)]

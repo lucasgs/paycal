@@ -104,6 +104,12 @@ fn csv_export_works() {
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
+    assert!(stdout.contains("format,csv"));
+    assert!(stdout.contains("hours_per_day,8"));
+    assert!(stdout.contains("days_per_week,5.00"));
+    assert!(stdout.contains("weeks_per_year,52.00"));
+    assert!(stdout.contains("months_per_year,12.00"));
+    assert!(stdout.contains("generated_at_unix_seconds,"));
     assert!(stdout.contains("rate,weekly,monthly,yearly"));
     assert!(stdout.contains("20.00,800.00,3466.67,41600.00"));
     assert!(stdout.contains("25.00,1000.00,4333.33,52000.00"));
@@ -151,6 +157,10 @@ fn json_export_works() {
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
+    assert!(stdout.contains("\"metadata\""));
+    assert!(stdout.contains("\"format\": \"json\""));
+    assert!(stdout.contains("\"hours_per_day\": 8"));
+    assert!(stdout.contains("\"generated_at_unix_seconds\":"));
     assert!(stdout.contains("\"schedule\""));
     assert!(stdout.contains("\"results\""));
     assert!(stdout.contains("\"rate\": \"20.00\""));
@@ -168,6 +178,7 @@ fn json_export_includes_sort_metadata() {
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
     assert!(stdout.contains("\"sort\": \"yearly\""));
+    assert!(stdout.contains("\"format\": \"json\""));
     let twenty = stdout.find("\"rate\": \"20.00\"").unwrap();
     let twenty_five = stdout.find("\"rate\": \"25.00\"").unwrap();
     assert!(twenty < twenty_five);
@@ -190,6 +201,7 @@ fn json_export_with_currency_works() {
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
     assert!(stdout.contains("\"currency\": \"USD\""));
+    assert!(stdout.contains("\"hours_per_day\": 8"));
     assert!(stdout.contains("\"rate\": \"USD 20.00\""));
     assert!(stdout.contains("\"yearly\": \"USD 52000.00\""));
 }
@@ -205,6 +217,8 @@ fn output_file_writes_csv_and_suppresses_stdout() {
     assert!(output.stdout.is_empty());
 
     let written = fs::read_to_string(&path).expect("output file should exist");
+    assert!(written.contains("format,csv"));
+    assert!(written.contains("generated_at_unix_seconds,"));
     assert!(written.contains("rate,weekly,monthly,yearly"));
     assert!(written.contains("20.00,800.00,3466.67,41600.00"));
 

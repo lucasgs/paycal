@@ -88,20 +88,26 @@ cargo run -- --rate 25,20,30 --hours 8 --sort yearly
 +-------+---------+---------+----------+
 ```
 
-CSV output with sort metadata:
+CSV output with metadata:
 
 ```bash
 cargo run -- --rate 25,20 --hours 8 --format csv --sort rate
 ```
 
 ```text
+format,csv
+hours_per_day,8
+days_per_week,5.00
+weeks_per_year,52.00
+months_per_year,12.00
+generated_at_unix_seconds,1712345678
 sort,rate
 rate,weekly,monthly,yearly
 20.00,800.00,3466.67,41600.00
 25.00,1000.00,4333.33,52000.00
 ```
 
-JSON output with sort metadata:
+JSON output with metadata:
 
 ```bash
 cargo run -- --rate 25,20 --hours 8 --format json --sort yearly
@@ -109,12 +115,17 @@ cargo run -- --rate 25,20 --hours 8 --format json --sort yearly
 
 ```json
 {
+  "metadata": {
+    "format": "json",
+    "hours_per_day": 8,
+    "generated_at_unix_seconds": 1712345678,
+    "sort": "yearly"
+  },
   "schedule": {
     "days_per_week": "5.00",
     "weeks_per_year": "52.00",
     "months_per_year": "12.00"
   },
-  "sort": "yearly",
   "results": [
     {
       "rate": "20.00",
