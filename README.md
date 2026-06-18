@@ -16,17 +16,24 @@ Preferred named-flag form:
 cargo run -- --rate 20 --hours 8
 ```
 
+Multi-rate with shared hours:
+
+```bash
+cargo run -- --rate 20,25,30 --hours 8
+```
+
 Optional schedule flags:
 
 ```bash
-cargo run -- --rate 20 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12
+cargo run -- --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12
 ```
 
 Backwards-compatible positional form still works:
 
 ```bash
 cargo run -- 20 8
-cargo run -- 20 8 4 48 12
+cargo run -- 20,25 8
+cargo run -- 20,25 8 4 48 12
 ```
 
 You can also see the built-in help output:
@@ -37,38 +44,33 @@ cargo run -- --help
 
 ## Examples
 
-Default schedule:
+Single rate:
 
 ```bash
 cargo run -- --rate 20 --hours 8
 ```
 
 ```text
-+-----------------+-----------+
-| Period          | Amount    |
-+-----------------+-----------+
-| Hourly          |     20.00 |
-| Weekly          |    800.00 |
-| Monthly         |   3466.67 |
-| Yearly          |  41600.00 |
-+-----------------+-----------+
++----------+----------+----------+----------+----------+
+| Rate     | Hourly   | Weekly   | Monthly  | Yearly   |
++----------+----------+----------+----------+----------+
+|    20.00 |    20.00 |   800.00 |  3466.67 | 41600.00 |
++----------+----------+----------+----------+----------+
 ```
 
-Custom schedule:
+Multiple rates:
 
 ```bash
-cargo run -- --rate 20 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12
+cargo run -- --rate 20,25 --hours 8
 ```
 
 ```text
-+-----------------+-----------+
-| Period          | Amount    |
-+-----------------+-----------+
-| Hourly          |     20.00 |
-| Weekly          |    640.00 |
-| Monthly         |   2560.00 |
-| Yearly          |  30720.00 |
-+-----------------+-----------+
++----------+----------+----------+----------+----------+
+| Rate     | Hourly   | Weekly   | Monthly  | Yearly   |
++----------+----------+----------+----------+----------+
+|    20.00 |    20.00 |   800.00 |  3466.67 | 41600.00 |
+|    25.00 |    25.00 |  1000.00 |  4333.33 | 52000.00 |
++----------+----------+----------+----------+----------+
 ```
 
 ## Test

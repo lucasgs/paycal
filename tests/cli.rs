@@ -15,7 +15,7 @@ fn help_output_succeeds() {
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
     assert!(stdout.contains("Usage: paycal [OPTIONS]"));
-    assert!(stdout.contains("--rate <RATE>"));
+    assert!(stdout.contains("--rate <RATE[,RATE...]>"));
     assert!(stdout.contains("--hours <HOURS_PER_DAY>"));
 }
 
@@ -26,22 +26,30 @@ fn named_args_render_expected_table() {
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
-    assert!(stdout.contains("| Hourly          |     20.00 |"));
-    assert!(stdout.contains("| Weekly          |    800.00 |"));
-    assert!(stdout.contains("| Monthly         |   3466.67 |"));
-    assert!(stdout.contains("| Yearly          |  41600.00 |"));
+    assert!(stdout.contains("| Rate     | Hourly   | Weekly   | Monthly  | Yearly   |"));
+    assert!(stdout.contains("|    20.00 |    20.00 |   800.00 |  3466.67 | 41600.00 |"));
 }
 
 #[test]
-fn positional_args_still_work() {
-    let output = run_paycal(&["20", "8", "4", "48", "12"]);
+fn multi_rate_named_args_render_comparison_table() {
+    let output = run_paycal(&["--rate", "20,25", "--hours", "8"]);
 
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
-    assert!(stdout.contains("| Weekly          |    640.00 |"));
-    assert!(stdout.contains("| Monthly         |   2560.00 |"));
-    assert!(stdout.contains("| Yearly          |  30720.00 |"));
+    assert!(stdout.contains("|    20.00 |    20.00 |   800.00 |  3466.67 | 41600.00 |"));
+    assert!(stdout.contains("|    25.00 |    25.00 |  1000.00 |  4333.33 | 52000.00 |"));
+}
+
+#[test]
+fn positional_args_still_work() {
+    let output = run_paycal(&["20,25", "8", "4", "48", "12"]);
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
+    assert!(stdout.contains("|    20.00 |    20.00 |   640.00 |  2560.00 | 30720.00 |"));
+    assert!(stdout.contains("|    25.00 |    25.00 |   800.00 |  3200.00 | 38400.00 |"));
 }
 
 #[test]

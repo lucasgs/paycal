@@ -1,6 +1,6 @@
 use std::process::ExitCode;
 
-use paycal::{read_args, usage, CliAction};
+use paycal::{read_args, usage, CliAction, WorkSchedule};
 use rust_decimal::Decimal;
 
 fn main() -> ExitCode {
@@ -9,16 +9,8 @@ fn main() -> ExitCode {
             println!("{}", usage());
             ExitCode::SUCCESS
         }
-        Ok(CliAction::Calculate { input, schedule }) => {
-            let result = input.calculate_with_schedule(schedule);
-            println!("+-----------------+-----------+");
-            println!("| Period          | Amount    |");
-            println!("+-----------------+-----------+");
-            println!("| Hourly          | {:>9} |", format_money(result.hourly));
-            println!("| Weekly          | {:>9} |", format_money(result.weekly));
-            println!("| Monthly         | {:>9} |", format_money(result.monthly));
-            println!("| Yearly          | {:>9} |", format_money(result.yearly));
-            println!("+-----------------+-----------+");
+        Ok(CliAction::Calculate { inputs, schedule }) => {
+            print_results_table(&inputs, schedule);
             ExitCode::SUCCESS
         }
         Err(message) => {
@@ -26,6 +18,26 @@ fn main() -> ExitCode {
             ExitCode::from(1)
         }
     }
+}
+
+fn print_results_table(inputs: &[paycal::PayInput], schedule: WorkSchedule) {
+    println!("+----------+----------+----------+----------+----------+");
+    println!("| Rate     | Hourly   | Weekly   | Monthly  | Yearly   |");
+    println!("+----------+----------+----------+----------+----------+");
+
+    for input in inputs {
+        let result = input.calculate_with_schedule(schedule);
+        println!(
+            "| {:>8} | {:>8} | {:>8} | {:>8} | {:>8} |",
+            format_money(input.rate),
+            format_money(result.hourly),
+            format_money(result.weekly),
+            format_money(result.monthly),
+            format_money(result.yearly),
+        );
+    }
+
+    println!("+----------+----------+----------+----------+----------+");
 }
 
 fn format_money(value: Decimal) -> String {

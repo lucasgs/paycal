@@ -11,11 +11,11 @@ use crate::{PayInput, WorkSchedule};
     version,
     about = "CLI pay calculator",
     long_about = None,
-    after_help = "Examples:\n  paycal --rate 20 --hours 8\n  paycal --rate 20 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12\n  paycal 20 8\n  cargo run -- --rate 20 --hours 8"
+    after_help = "Examples:\n  paycal --rate 20 --hours 8\n  paycal --rate 20,25,30 --hours 8\n  paycal --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12\n  paycal 20,25 8\n  cargo run -- --rate 20,25,30 --hours 8"
 )]
 struct CliArgs {
-    #[arg(long, value_name = "RATE", allow_hyphen_values = true)]
-    rate: Option<Decimal>,
+    #[arg(long, value_name = "RATE[,RATE...]", allow_hyphen_values = true)]
+    rate: Option<String>,
     #[arg(long = "hours", value_name = "HOURS_PER_DAY")]
     hours_per_day: Option<u8>,
     #[arg(
@@ -36,8 +36,8 @@ struct CliArgs {
         allow_hyphen_values = true
     )]
     months_per_year: Option<Decimal>,
-    #[arg(value_name = "RATE", hide = true, allow_hyphen_values = true)]
-    positional_rate: Option<Decimal>,
+    #[arg(value_name = "RATE[,RATE...]", hide = true, allow_hyphen_values = true)]
+    positional_rate: Option<String>,
     #[arg(value_name = "HOURS_PER_DAY", hide = true)]
     positional_hours_per_day: Option<u8>,
     #[arg(value_name = "DAYS_PER_WEEK", hide = true, allow_hyphen_values = true)]
@@ -52,11 +52,11 @@ struct CliArgs {
     positional_months_per_year: Option<Decimal>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CliAction {
     Help,
     Calculate {
-        input: PayInput,
+        inputs: Vec<PayInput>,
         schedule: WorkSchedule,
     },
 }
@@ -66,12 +66,10 @@ pub fn usage() -> String {
     command.render_long_help().to_string()
 }
 
-/// Reads command-line arguments from the current process and parses them.
 pub fn read_args() -> Result<CliAction, String> {
     parse_args(env::args().skip(1))
 }
 
-/// Parses CLI arguments into either a help action or validated pay input.
 pub fn parse_args<I>(args: I) -> Result<CliAction, String>
 where
     I: IntoIterator<Item = String>,
@@ -84,13 +82,10 @@ where
         Err(error) => return Err(error.to_string().trim().to_string()),
     };
 
-    let rate = parsed
-        .rate
-        .or(parsed.positional_rate)
-        .ok_or_else(|| "either --rate <RATE> or positional <RATE> is required".to_string())?;
-    if rate < Decimal::ZERO {
-        return Err("rate must be non-negative".to_string());
-    }
+    let rate_text = parsed.rate.or(parsed.positional_rate).ok_or_else(|| {
+        "either --rate <RATE[,RATE...]> or positional <RATE[,RATE...]> is required".to_string()
+    })?;
+    let rates = parse_rates(&rate_text)?;
 
     let hours_per_day = parsed
         .hours_per_day
@@ -120,17 +115,42 @@ where
         .unwrap_or(Decimal::from(12));
     validate_positive_decimal(months_per_year, "months_per_year")?;
 
-    Ok(CliAction::Calculate {
-        input: PayInput {
+    let inputs = rates
+        .into_iter()
+        .map(|rate| PayInput {
             rate,
             hours_per_day,
-        },
+        })
+        .collect();
+
+    Ok(CliAction::Calculate {
+        inputs,
         schedule: WorkSchedule {
             days_per_week,
             weeks_per_year,
             months_per_year,
         },
     })
+}
+
+fn parse_rates(value: &str) -> Result<Vec<Decimal>, String> {
+    let parts: Vec<&str> = value.split(',').map(str::trim).collect();
+    if parts.is_empty() || parts.iter().any(|part| part.is_empty()) {
+        return Err("rate must be a comma-separated list of numbers".to_string());
+    }
+
+    let mut rates = Vec::with_capacity(parts.len());
+    for part in parts {
+        let rate: Decimal = part
+            .parse()
+            .map_err(|_| format!("invalid rate '{part}' in comma-separated rate list"))?;
+        if rate < Decimal::ZERO {
+            return Err("rate must be non-negative".to_string());
+        }
+        rates.push(rate);
+    }
+
+    Ok(rates)
 }
 
 fn validate_positive_decimal(value: Decimal, name: &str) -> Result<(), String> {
@@ -157,7 +177,8 @@ mod tests {
     #[test]
     fn parse_rejects_missing_args() {
         let err = parse_args(Vec::<String>::new()).unwrap_err();
-        assert!(err.contains("either --rate <RATE> or positional <RATE> is required"));
+        assert!(err
+            .contains("either --rate <RATE[,RATE...]> or positional <RATE[,RATE...]> is required"));
     }
 
     #[test]
@@ -181,7 +202,19 @@ mod tests {
             "8".to_string(),
         ])
         .unwrap_err();
-        assert!(err.contains("invalid value 'abc' for '--rate <RATE>'"));
+        assert_eq!(err, "invalid rate 'abc' in comma-separated rate list");
+    }
+
+    #[test]
+    fn parse_rejects_invalid_rate_list() {
+        let err = parse_args([
+            "--rate".to_string(),
+            "20,,30".to_string(),
+            "--hours".to_string(),
+            "8".to_string(),
+        ])
+        .unwrap_err();
+        assert_eq!(err, "rate must be a comma-separated list of numbers");
     }
 
     #[test]
@@ -212,7 +245,7 @@ mod tests {
     fn parse_accepts_named_args_with_defaults() {
         let action = parse_args([
             "--rate".to_string(),
-            "20".to_string(),
+            "20,25".to_string(),
             "--hours".to_string(),
             "8".to_string(),
         ])
@@ -221,10 +254,16 @@ mod tests {
         assert_eq!(
             action,
             CliAction::Calculate {
-                input: PayInput {
-                    rate: dec!(20.0),
-                    hours_per_day: 8,
-                },
+                inputs: vec![
+                    PayInput {
+                        rate: dec!(20.0),
+                        hours_per_day: 8,
+                    },
+                    PayInput {
+                        rate: dec!(25.0),
+                        hours_per_day: 8,
+                    },
+                ],
                 schedule: WorkSchedule::default(),
             }
         );
@@ -234,7 +273,7 @@ mod tests {
     fn parse_accepts_custom_schedule_flags() {
         let action = parse_args([
             "--rate".to_string(),
-            "20".to_string(),
+            "20,25".to_string(),
             "--hours".to_string(),
             "8".to_string(),
             "--days-per-week".to_string(),
@@ -249,10 +288,16 @@ mod tests {
         assert_eq!(
             action,
             CliAction::Calculate {
-                input: PayInput {
-                    rate: dec!(20.0),
-                    hours_per_day: 8,
-                },
+                inputs: vec![
+                    PayInput {
+                        rate: dec!(20.0),
+                        hours_per_day: 8,
+                    },
+                    PayInput {
+                        rate: dec!(25.0),
+                        hours_per_day: 8,
+                    },
+                ],
                 schedule: WorkSchedule {
                     days_per_week: dec!(4.0),
                     weeks_per_year: dec!(48.0),
@@ -265,7 +310,7 @@ mod tests {
     #[test]
     fn parse_accepts_positional_args_for_backwards_compatibility() {
         let action = parse_args([
-            "20".to_string(),
+            "20,25".to_string(),
             "8".to_string(),
             "4".to_string(),
             "48".to_string(),
@@ -276,10 +321,16 @@ mod tests {
         assert_eq!(
             action,
             CliAction::Calculate {
-                input: PayInput {
-                    rate: dec!(20.0),
-                    hours_per_day: 8,
-                },
+                inputs: vec![
+                    PayInput {
+                        rate: dec!(20.0),
+                        hours_per_day: 8,
+                    },
+                    PayInput {
+                        rate: dec!(25.0),
+                        hours_per_day: 8,
+                    },
+                ],
                 schedule: WorkSchedule {
                     days_per_week: dec!(4.0),
                     weeks_per_year: dec!(48.0),
@@ -335,7 +386,7 @@ mod tests {
     fn parse_accepts_decimal_rate() {
         let action = parse_args([
             "--rate".to_string(),
-            "22.75".to_string(),
+            "22.75,30.50".to_string(),
             "--hours".to_string(),
             "7".to_string(),
         ])
@@ -344,10 +395,16 @@ mod tests {
         assert_eq!(
             action,
             CliAction::Calculate {
-                input: PayInput {
-                    rate: dec!(22.75),
-                    hours_per_day: 7,
-                },
+                inputs: vec![
+                    PayInput {
+                        rate: dec!(22.75),
+                        hours_per_day: 7,
+                    },
+                    PayInput {
+                        rate: dec!(30.50),
+                        hours_per_day: 7,
+                    },
+                ],
                 schedule: WorkSchedule::default(),
             }
         );
@@ -355,7 +412,7 @@ mod tests {
 
     #[test]
     fn parse_rejects_missing_hours_with_named_args() {
-        let err = parse_args(["--rate".to_string(), "20".to_string()]).unwrap_err();
+        let err = parse_args(["--rate".to_string(), "20,25".to_string()]).unwrap_err();
         assert!(err
             .contains("either --hours <HOURS_PER_DAY> or positional <HOURS_PER_DAY> is required"));
     }
