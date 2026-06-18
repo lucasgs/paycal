@@ -1,25 +1,28 @@
 use std::process::ExitCode;
 
-use paycal::{read_args, CliAction, USAGE};
+use paycal::{read_args, usage, CliAction};
 use rust_decimal::Decimal;
 
 fn main() -> ExitCode {
     match read_args() {
         Ok(CliAction::Help) => {
-            println!("{USAGE}");
+            println!("{}", usage());
             ExitCode::SUCCESS
         }
         Ok(CliAction::Calculate { input, schedule }) => {
             let result = input.calculate_with_schedule(schedule);
-            println!("* Results *");
-            println!("Hourly:  {}", format_money(result.hourly));
-            println!("Weekly:  {}", format_money(result.weekly));
-            println!("Monthly: {}", format_money(result.monthly));
-            println!("Yearly:  {}", format_money(result.yearly));
+            println!("+-----------------+-----------+");
+            println!("| Period          | Amount    |");
+            println!("+-----------------+-----------+");
+            println!("| Hourly          | {:>9} |", format_money(result.hourly));
+            println!("| Weekly          | {:>9} |", format_money(result.weekly));
+            println!("| Monthly         | {:>9} |", format_money(result.monthly));
+            println!("| Yearly          | {:>9} |", format_money(result.yearly));
+            println!("+-----------------+-----------+");
             ExitCode::SUCCESS
         }
         Err(message) => {
-            eprintln!("Error: {message}\n\n{USAGE}");
+            eprintln!("Error: {message}\n\n{}", usage());
             ExitCode::from(1)
         }
     }
