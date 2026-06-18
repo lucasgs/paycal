@@ -1,0 +1,109 @@
+use std::env;
+
+use crate::PayInput;
+
+pub const USAGE: &str = "paycal - CLI pay calculator\n\nUsage:\n  paycal <rate> <hours_per_day>\n  paycal --help\n\nArguments:\n  <rate>           Hourly pay rate (must be non-negative)\n  <hours_per_day>  Hours worked per day (must be between 0 and 24)\n\nExamples:\n  paycal 20 8\n  cargo run -- 20 8";
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CliAction {
+    Help,
+    Calculate(PayInput),
+}
+
+/// Reads command-line arguments from the current process and parses them.
+pub fn read_args() -> Result<CliAction, String> {
+    parse_args(env::args().skip(1))
+}
+
+/// Parses CLI arguments into either a help action or validated pay input.
+pub fn parse_args<I>(args: I) -> Result<CliAction, String>
+where
+    I: IntoIterator<Item = String>,
+{
+    let args: Vec<String> = args.into_iter().collect();
+
+    if args.len() == 1 && matches!(args[0].as_str(), "--help" | "-h") {
+        return Ok(CliAction::Help);
+    }
+
+    if args.len() != 2 {
+        return Err("expected exactly 2 arguments: <rate> <hours_per_day>".to_string());
+    }
+
+    let rate: f64 = args[0]
+        .parse()
+        .map_err(|_| "rate must be a valid number".to_string())?;
+    if !rate.is_finite() {
+        return Err("rate must be a finite number".to_string());
+    }
+    if rate < 0.0 {
+        return Err("rate must be non-negative".to_string());
+    }
+
+    let hours_per_day: u8 = args[1]
+        .parse()
+        .map_err(|_| "hours_per_day must be a whole number between 0 and 24".to_string())?;
+    if hours_per_day > 24 {
+        return Err("hours_per_day must be between 0 and 24".to_string());
+    }
+
+    Ok(CliAction::Calculate(PayInput {
+        rate,
+        hours_per_day,
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_args, CliAction};
+    use crate::PayInput;
+
+    #[test]
+    fn parse_help_flag() {
+        let action = parse_args(["--help".to_string()]).unwrap();
+        assert!(matches!(action, CliAction::Help));
+    }
+
+    #[test]
+    fn parse_rejects_missing_args() {
+        let err = parse_args(Vec::<String>::new()).unwrap_err();
+        assert_eq!(err, "expected exactly 2 arguments: <rate> <hours_per_day>");
+    }
+
+    #[test]
+    fn parse_rejects_negative_rate() {
+        let err = parse_args(["-1".to_string(), "8".to_string()]).unwrap_err();
+        assert_eq!(err, "rate must be non-negative");
+    }
+
+    #[test]
+    fn parse_rejects_invalid_rate() {
+        let err = parse_args(["abc".to_string(), "8".to_string()]).unwrap_err();
+        assert_eq!(err, "rate must be a valid number");
+    }
+
+    #[test]
+    fn parse_rejects_invalid_hours() {
+        let err = parse_args(["20".to_string(), "abc".to_string()]).unwrap_err();
+        assert_eq!(err, "hours_per_day must be a whole number between 0 and 24");
+    }
+
+    #[test]
+    fn parse_rejects_unrealistic_hours() {
+        let err = parse_args(["20".to_string(), "25".to_string()]).unwrap_err();
+        assert_eq!(err, "hours_per_day must be between 0 and 24");
+    }
+
+    #[test]
+    fn parse_accepts_valid_args() {
+        let action = parse_args(["20".to_string(), "8".to_string()]).unwrap();
+
+        assert_eq!(
+            action,
+            CliAction::Calculate(PayInput {
+                rate: 20.0,
+                hours_per_day: 8,
+            })
+        );
+    }
+}
