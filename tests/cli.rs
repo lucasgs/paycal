@@ -6,6 +6,8 @@ use std::{
 
 fn run_paycal(args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_paycal"))
+        .env("LC_ALL", "en_US.UTF-8")
+        .env("LANG", "en_US.UTF-8")
         .args(args)
         .output()
         .expect("failed to run paycal")
@@ -36,6 +38,7 @@ fn help_output_succeeds() {
     assert!(stdout.contains("--hours <HOURS_PER_DAY>"));
     assert!(stdout.contains("--format <FORMAT>"));
     assert!(stdout.contains("--currency <CURRENCY>"));
+    assert!(stdout.contains("--locale <LOCALE>"));
     assert!(stdout.contains("--output <FILE>"));
     assert!(stdout.contains("--sort <FIELD>"));
 }
@@ -51,7 +54,7 @@ fn named_args_render_expected_table() {
     assert!(stdout.contains("Weekly"));
     assert!(stdout.contains("Monthly"));
     assert!(stdout.contains("Yearly"));
-    assert!(stdout.contains("| 20.00 | 800.00 | 3466.67 | 41600.00 |"));
+    assert!(stdout.contains("| 20.00 | 800.00 | 3,466.67 | 41,600.00 |"));
     assert!(!stdout.contains("Hourly"));
 }
 
@@ -62,9 +65,15 @@ fn sorting_by_yearly_reorders_rows() {
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
-    let twenty = stdout.find("20.00 |  800.00 | 3466.67 | 41600.00").unwrap();
-    let twenty_five = stdout.find("25.00 | 1000.00 | 4333.33 | 52000.00").unwrap();
-    let thirty = stdout.find("30.00 | 1200.00 | 5200.00 | 62400.00").unwrap();
+    let twenty = stdout
+        .find("20.00 |   800.00 | 3,466.67 | 41,600.00")
+        .unwrap();
+    let twenty_five = stdout
+        .find("25.00 | 1,000.00 | 4,333.33 | 52,000.00")
+        .unwrap();
+    let thirty = stdout
+        .find("30.00 | 1,200.00 | 5,200.00 | 62,400.00")
+        .unwrap();
     assert!(twenty < twenty_five && twenty_five < thirty);
 }
 
@@ -79,8 +88,8 @@ fn currency_code_formats_all_output_columns() {
     assert!(stdout.contains("Weekly"));
     assert!(stdout.contains("Monthly"));
     assert!(stdout.contains("Yearly"));
-    assert!(stdout.contains("| USD 20.00 |  USD 800.00 | USD 3466.67 | USD 41600.00 |"));
-    assert!(stdout.contains("| USD 25.00 | USD 1000.00 | USD 4333.33 | USD 52000.00 |"));
+    assert!(stdout.contains("| USD 20.00 |   USD 800.00 | USD 3,466.67 | USD 41,600.00 |"));
+    assert!(stdout.contains("| USD 25.00 | USD 1,000.00 | USD 4,333.33 | USD 52,000.00 |"));
 }
 
 #[test]
@@ -94,7 +103,29 @@ fn currency_symbol_formats_all_output_columns() {
     assert!(stdout.contains("Weekly"));
     assert!(stdout.contains("Monthly"));
     assert!(stdout.contains("Yearly"));
-    assert!(stdout.contains("| $20.00 | $800.00 | $3466.67 | $41600.00 |"));
+    assert!(stdout.contains("| $20.00 | $800.00 | $3,466.67 | $41,600.00 |"));
+}
+
+#[test]
+fn locale_flag_formats_table_output() {
+    let output = run_paycal(&[
+        "--rate",
+        "1234.56",
+        "--hours",
+        "8",
+        "--currency",
+        "€",
+        "--locale",
+        "de-DE",
+    ]);
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
+    assert!(stdout.contains("€1.234,56"));
+    assert!(stdout.contains("€49.382,40"));
+    assert!(stdout.contains("€213.990,40"));
+    assert!(stdout.contains("€2.567.884,80"));
 }
 
 #[test]
@@ -105,14 +136,15 @@ fn csv_export_works() {
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
     assert!(stdout.contains("format,csv"));
+    assert!(stdout.contains("locale,en-US"));
     assert!(stdout.contains("hours_per_day,8"));
     assert!(stdout.contains("days_per_week,5.00"));
     assert!(stdout.contains("weeks_per_year,52.00"));
     assert!(stdout.contains("months_per_year,12.00"));
     assert!(stdout.contains("generated_at_unix_seconds,"));
     assert!(stdout.contains("rate,weekly,monthly,yearly"));
-    assert!(stdout.contains("20.00,800.00,3466.67,41600.00"));
-    assert!(stdout.contains("25.00,1000.00,4333.33,52000.00"));
+    assert!(stdout.contains("20.00,800.00,\"3,466.67\",\"41,600.00\""));
+    assert!(stdout.contains("25.00,\"1,000.00\",\"4,333.33\",\"52,000.00\""));
 }
 
 #[test]
@@ -125,8 +157,12 @@ fn csv_export_includes_sort_metadata() {
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
     assert!(stdout.contains("sort,rate"));
-    let twenty = stdout.find("20.00,800.00,3466.67,41600.00").unwrap();
-    let twenty_five = stdout.find("25.00,1000.00,4333.33,52000.00").unwrap();
+    let twenty = stdout
+        .find("20.00,800.00,\"3,466.67\",\"41,600.00\"")
+        .unwrap();
+    let twenty_five = stdout
+        .find("25.00,\"1,000.00\",\"4,333.33\",\"52,000.00\"")
+        .unwrap();
     assert!(twenty < twenty_five);
 }
 
@@ -147,7 +183,21 @@ fn csv_export_with_currency_works() {
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
     assert!(stdout.contains("currency,USD"));
-    assert!(stdout.contains("USD 20.00,USD 800.00,USD 3466.67,USD 41600.00"));
+    assert!(stdout.contains("USD 20.00,USD 800.00,\"USD 3,466.67\",\"USD 41,600.00\""));
+}
+
+#[test]
+fn csv_export_quotes_locale_formatted_values() {
+    let output = run_paycal(&[
+        "--rate", "1234.56", "--hours", "8", "--format", "csv", "--locale", "de-DE",
+    ]);
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
+    assert!(stdout.contains("locale,de-DE"));
+    assert!(stdout.contains("days_per_week,\"5,00\""));
+    assert!(stdout.contains("\"1.234,56\",\"49.382,40\",\"213.990,40\",\"2.567.884,80\""));
 }
 
 #[test]
@@ -159,12 +209,13 @@ fn json_export_works() {
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
     assert!(stdout.contains("\"metadata\""));
     assert!(stdout.contains("\"format\": \"json\""));
+    assert!(stdout.contains("\"locale\": \"en-US\""));
     assert!(stdout.contains("\"hours_per_day\": 8"));
     assert!(stdout.contains("\"generated_at_unix_seconds\":"));
     assert!(stdout.contains("\"schedule\""));
     assert!(stdout.contains("\"results\""));
     assert!(stdout.contains("\"rate\": \"20.00\""));
-    assert!(stdout.contains("\"yearly\": \"52000.00\""));
+    assert!(stdout.contains("\"yearly\": \"52,000.00\""));
     assert!(!stdout.contains("\"hourly\""));
 }
 
@@ -203,7 +254,21 @@ fn json_export_with_currency_works() {
     assert!(stdout.contains("\"currency\": \"USD\""));
     assert!(stdout.contains("\"hours_per_day\": 8"));
     assert!(stdout.contains("\"rate\": \"USD 20.00\""));
-    assert!(stdout.contains("\"yearly\": \"USD 52000.00\""));
+    assert!(stdout.contains("\"yearly\": \"USD 52,000.00\""));
+}
+
+#[test]
+fn json_export_uses_locale_formatting() {
+    let output = run_paycal(&[
+        "--rate", "1234.56", "--hours", "8", "--format", "json", "--locale", "de-DE",
+    ]);
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
+    assert!(stdout.contains("\"locale\": \"de-DE\""));
+    assert!(stdout.contains("\"rate\": \"1.234,56\""));
+    assert!(stdout.contains("\"yearly\": \"2.567.884,80\""));
 }
 
 #[test]
@@ -220,7 +285,7 @@ fn output_file_writes_csv_and_suppresses_stdout() {
     assert!(written.contains("format,csv"));
     assert!(written.contains("generated_at_unix_seconds,"));
     assert!(written.contains("rate,weekly,monthly,yearly"));
-    assert!(written.contains("20.00,800.00,3466.67,41600.00"));
+    assert!(written.contains("20.00,800.00,\"3,466.67\",\"41,600.00\""));
 
     let _ = fs::remove_file(path);
 }
@@ -232,8 +297,8 @@ fn positional_args_still_work() {
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf8");
-    assert!(stdout.contains("| 20.00 | 640.00 | 2560.00 | 30720.00 |"));
-    assert!(stdout.contains("| 25.00 | 800.00 | 3200.00 | 38400.00 |"));
+    assert!(stdout.contains("| 20.00 | 640.00 | 2,560.00 | 30,720.00 |"));
+    assert!(stdout.contains("| 25.00 | 800.00 | 3,200.00 | 38,400.00 |"));
 }
 
 #[test]

@@ -26,7 +26,7 @@ pub enum SortBy {
     version,
     about = "CLI pay calculator",
     long_about = None,
-    after_help = "Examples:\n  paycal --rate 20 --hours 8\n  paycal --rate 20,25,30 --hours 8\n  paycal --rate 20,25 --hours 8 --currency USD\n  paycal --rate 20,25 --hours 8 --sort yearly\n  paycal --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12\n  paycal --rate 20,25 --hours 8 --format csv\n  paycal --rate 20,25 --hours 8 --format json\n  paycal 20,25 8\n  cargo run -- --rate 20,25,30 --hours 8"
+    after_help = "Examples:\n  paycal --rate 20 --hours 8\n  paycal --rate 20,25,30 --hours 8\n  paycal --rate 20,25 --hours 8 --currency USD\n  paycal --rate 1234.56 --hours 8 --locale de-DE\n  paycal --rate 20,25 --hours 8 --sort yearly\n  paycal --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12\n  paycal --rate 20,25 --hours 8 --format csv\n  paycal --rate 20,25 --hours 8 --format json\n  paycal 20,25 8\n  cargo run -- --rate 20,25,30 --hours 8"
 )]
 struct CliArgs {
     #[arg(long, value_name = "RATE[,RATE...]", allow_hyphen_values = true)]
@@ -37,6 +37,8 @@ struct CliArgs {
     format: OutputFormat,
     #[arg(long, value_name = "CURRENCY")]
     currency: Option<String>,
+    #[arg(long, value_name = "LOCALE")]
+    locale: Option<String>,
     #[arg(long, value_name = "FILE")]
     output: Option<String>,
     #[arg(long, value_enum, value_name = "FIELD")]
@@ -83,6 +85,7 @@ pub enum CliAction {
         schedule: WorkSchedule,
         format: OutputFormat,
         currency: Option<String>,
+        locale: Option<String>,
         output: Option<String>,
         sort: Option<SortBy>,
     },
@@ -147,6 +150,11 @@ where
         return Err("currency must not be empty".to_string());
     }
 
+    let locale = parsed.locale.map(|value| value.trim().to_string());
+    if matches!(locale.as_deref(), Some("")) {
+        return Err("locale must not be empty".to_string());
+    }
+
     let output = parsed.output.map(|value| value.trim().to_string());
     if matches!(output.as_deref(), Some("")) {
         return Err("output must not be empty".to_string());
@@ -169,6 +177,7 @@ where
         },
         format: parsed.format,
         currency,
+        locale,
         output,
         sort: parsed.sort,
     })
@@ -308,6 +317,7 @@ mod tests {
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Table,
                 currency: None,
+                locale: None,
                 output: None,
                 sort: None,
             }
@@ -342,6 +352,7 @@ mod tests {
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Table,
                 currency: Some("USD".to_string()),
+                locale: None,
                 output: None,
                 sort: None,
             }
@@ -376,6 +387,7 @@ mod tests {
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Csv,
                 currency: None,
+                locale: None,
                 output: None,
                 sort: None,
             }
@@ -410,6 +422,7 @@ mod tests {
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Table,
                 currency: None,
+                locale: None,
                 output: Some("report.csv".to_string()),
                 sort: None,
             }
@@ -444,6 +457,7 @@ mod tests {
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Table,
                 currency: None,
+                locale: None,
                 output: None,
                 sort: Some(SortBy::Yearly),
             }
@@ -486,6 +500,7 @@ mod tests {
                 },
                 format: OutputFormat::Table,
                 currency: None,
+                locale: None,
                 output: None,
                 sort: None,
             }
@@ -523,6 +538,7 @@ mod tests {
                 },
                 format: OutputFormat::Table,
                 currency: None,
+                locale: None,
                 output: None,
                 sort: None,
             }
@@ -599,6 +615,42 @@ mod tests {
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Json,
                 currency: None,
+                locale: None,
+                output: None,
+                sort: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_accepts_locale() {
+        let action = parse_args([
+            "--rate".to_string(),
+            "20,25".to_string(),
+            "--hours".to_string(),
+            "8".to_string(),
+            "--locale".to_string(),
+            "de-DE".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            action,
+            CliAction::Calculate {
+                inputs: vec![
+                    PayInput {
+                        rate: dec!(20.0),
+                        hours_per_day: 8,
+                    },
+                    PayInput {
+                        rate: dec!(25.0),
+                        hours_per_day: 8,
+                    },
+                ],
+                schedule: WorkSchedule::default(),
+                format: OutputFormat::Table,
+                currency: None,
+                locale: Some("de-DE".to_string()),
                 output: None,
                 sort: None,
             }
