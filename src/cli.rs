@@ -18,7 +18,7 @@ pub enum OutputFormat {
     version,
     about = "CLI pay calculator",
     long_about = None,
-    after_help = "Examples:\n  paycal --rate 20 --hours 8\n  paycal --rate 20,25,30 --hours 8\n  paycal --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12\n  paycal --rate 20,25 --hours 8 --format csv\n  paycal --rate 20,25 --hours 8 --format json\n  paycal 20,25 8\n  cargo run -- --rate 20,25,30 --hours 8"
+    after_help = "Examples:\n  paycal --rate 20 --hours 8\n  paycal --rate 20,25,30 --hours 8\n  paycal --rate 20,25 --hours 8 --currency USD\n  paycal --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12\n  paycal --rate 20,25 --hours 8 --format csv\n  paycal --rate 20,25 --hours 8 --format json\n  paycal 20,25 8\n  cargo run -- --rate 20,25,30 --hours 8"
 )]
 struct CliArgs {
     #[arg(long, value_name = "RATE[,RATE...]", allow_hyphen_values = true)]
@@ -27,6 +27,8 @@ struct CliArgs {
     hours_per_day: Option<u8>,
     #[arg(long, value_enum, default_value_t = OutputFormat::Table)]
     format: OutputFormat,
+    #[arg(long, value_name = "CURRENCY")]
+    currency: Option<String>,
     #[arg(
         long = "days-per-week",
         value_name = "DAYS",
@@ -68,6 +70,7 @@ pub enum CliAction {
         inputs: Vec<PayInput>,
         schedule: WorkSchedule,
         format: OutputFormat,
+        currency: Option<String>,
     },
 }
 
@@ -125,6 +128,11 @@ where
         .unwrap_or(Decimal::from(12));
     validate_positive_decimal(months_per_year, "months_per_year")?;
 
+    let currency = parsed.currency.map(|value| value.trim().to_string());
+    if matches!(currency.as_deref(), Some("")) {
+        return Err("currency must not be empty".to_string());
+    }
+
     let inputs = rates
         .into_iter()
         .map(|rate| PayInput {
@@ -141,6 +149,7 @@ where
             months_per_year,
         },
         format: parsed.format,
+        currency,
     })
 }
 
@@ -277,6 +286,39 @@ mod tests {
                 ],
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Table,
+                currency: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_accepts_currency() {
+        let action = parse_args([
+            "--rate".to_string(),
+            "20,25".to_string(),
+            "--hours".to_string(),
+            "8".to_string(),
+            "--currency".to_string(),
+            "USD".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            action,
+            CliAction::Calculate {
+                inputs: vec![
+                    PayInput {
+                        rate: dec!(20.0),
+                        hours_per_day: 8,
+                    },
+                    PayInput {
+                        rate: dec!(25.0),
+                        hours_per_day: 8,
+                    },
+                ],
+                schedule: WorkSchedule::default(),
+                format: OutputFormat::Table,
+                currency: Some("USD".to_string()),
             }
         );
     }
@@ -308,6 +350,7 @@ mod tests {
                 ],
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Csv,
+                currency: None,
             }
         );
     }
@@ -347,6 +390,7 @@ mod tests {
                     months_per_year: dec!(12.0),
                 },
                 format: OutputFormat::Table,
+                currency: None,
             }
         );
     }
@@ -381,6 +425,7 @@ mod tests {
                     months_per_year: dec!(12.0),
                 },
                 format: OutputFormat::Table,
+                currency: None,
             }
         );
     }
@@ -454,6 +499,7 @@ mod tests {
                 ],
                 schedule: WorkSchedule::default(),
                 format: OutputFormat::Json,
+                currency: None,
             }
         );
     }

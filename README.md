@@ -22,6 +22,13 @@ Multi-rate with shared hours:
 cargo run -- --rate 20,25,30 --hours 8
 ```
 
+Add an optional currency label or symbol:
+
+```bash
+cargo run -- --rate 20,25 --hours 8 --currency USD
+cargo run -- --rate 20,25 --hours 8 --currency $
+```
+
 Optional schedule flags:
 
 ```bash
@@ -54,34 +61,35 @@ cargo run -- --help
 Table output:
 
 ```bash
-cargo run -- --rate 20,25 --hours 8
+cargo run -- --rate 20,25 --hours 8 --currency USD
 ```
 
 ```text
-+----------+----------+----------+----------+
-| Rate     | Weekly   | Monthly  | Yearly   |
-+----------+----------+----------+----------+
-|    20.00 |   800.00 |  3466.67 | 41600.00 |
-|    25.00 |  1000.00 |  4333.33 | 52000.00 |
-+----------+----------+----------+----------+
++-----------+-------------+-------------+--------------+
+|      Rate |      Weekly |     Monthly |       Yearly |
++-----------+-------------+-------------+--------------+
+| USD 20.00 |  USD 800.00 | USD 3466.67 | USD 41600.00 |
+| USD 25.00 | USD 1000.00 | USD 4333.33 | USD 52000.00 |
++-----------+-------------+-------------+--------------+
 ```
 
 CSV output:
 
 ```bash
-cargo run -- --rate 20,25 --hours 8 --format csv
+cargo run -- --rate 20,25 --hours 8 --format csv --currency USD
 ```
 
 ```text
+currency,USD
 rate,weekly,monthly,yearly
-20.00,800.00,3466.67,41600.00
-25.00,1000.00,4333.33,52000.00
+USD 20.00,USD 800.00,USD 3466.67,USD 41600.00
+USD 25.00,USD 1000.00,USD 4333.33,USD 52000.00
 ```
 
 JSON output:
 
 ```bash
-cargo run -- --rate 20,25 --hours 8 --format json
+cargo run -- --rate 20,25 --hours 8 --format json --currency USD
 ```
 
 ```json
@@ -91,18 +99,19 @@ cargo run -- --rate 20,25 --hours 8 --format json
     "weeks_per_year": "52.00",
     "months_per_year": "12.00"
   },
+  "currency": "USD",
   "results": [
     {
-      "rate": "20.00",
-      "weekly": "800.00",
-      "monthly": "3466.67",
-      "yearly": "41600.00"
+      "rate": "USD 20.00",
+      "weekly": "USD 800.00",
+      "monthly": "USD 3466.67",
+      "yearly": "USD 41600.00"
     },
     {
-      "rate": "25.00",
-      "weekly": "1000.00",
-      "monthly": "4333.33",
-      "yearly": "52000.00"
+      "rate": "USD 25.00",
+      "weekly": "USD 1000.00",
+      "monthly": "USD 4333.33",
+      "yearly": "USD 52000.00"
     }
   ]
 }
