@@ -1,30 +1,46 @@
 # paycal
-CLI pay calculator
 
-## Installation 
+CLI pay calculator.
 
-First, install [Rust](https://www.rust-lang.org/tools/install)
+## Installation
 
-Then clone this repo and execute the following with your parameters:
+First, install [Rust](https://www.rust-lang.org/tools/install).
 
-`cargo run {rate} {hours_by_date}`
+Then clone this repo and run the CLI with your parameters:
 
-- {rate} amount pay by hour
-- {hours_by_date} total hour by day
+```bash
+cargo run -- <rate> <hours_per_day>
+```
+
+Arguments:
+
+- `<rate>`: hourly pay rate
+- `<hours_per_day>`: hours worked per day
+
+You can also see the built-in help output:
+
+```bash
+cargo run -- --help
+```
 
 ## Example
 
-`cargo run 20 8`
+```bash
+cargo run -- 20 8
+```
 
-```
+```text
 * Results *
-Hourly:  35
-Weekly:  1400
-Monthly: 6066
-Yearly:  72800
+Hourly:  20.00
+Weekly:  800.00
+Monthly: 3466.67
+Yearly:  41600.00
 ```
+
 ## Test
 
-Execute the following to run all the tests
+Run the test suite with:
 
-`cargo test`
+```bash
+cargo test
+```
