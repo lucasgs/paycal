@@ -9,3 +9,5 @@ edition = "2021"
 clap = { version = "4.5.41", features = ["derive"] }
 rust_decimal = "1.39.0"
 rust_decimal_macros = "1.39.0"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"

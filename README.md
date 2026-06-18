@@ -28,6 +28,13 @@ Optional schedule flags:
 cargo run -- --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12
 ```
 
+Export as CSV or JSON:
+
+```bash
+cargo run -- --rate 20,25 --hours 8 --format csv
+cargo run -- --rate 20,25 --hours 8 --format json
+```
+
 Backwards-compatible positional form still works:
 
 ```bash
@@ -44,21 +51,7 @@ cargo run -- --help
 
 ## Examples
 
-Single rate:
-
-```bash
-cargo run -- --rate 20 --hours 8
-```
-
-```text
-+----------+----------+----------+----------+----------+
-| Rate     | Hourly   | Weekly   | Monthly  | Yearly   |
-+----------+----------+----------+----------+----------+
-|    20.00 |    20.00 |   800.00 |  3466.67 | 41600.00 |
-+----------+----------+----------+----------+----------+
-```
-
-Multiple rates:
+Table output:
 
 ```bash
 cargo run -- --rate 20,25 --hours 8
@@ -71,6 +64,50 @@ cargo run -- --rate 20,25 --hours 8
 |    20.00 |    20.00 |   800.00 |  3466.67 | 41600.00 |
 |    25.00 |    25.00 |  1000.00 |  4333.33 | 52000.00 |
 +----------+----------+----------+----------+----------+
+```
+
+CSV output:
+
+```bash
+cargo run -- --rate 20,25 --hours 8 --format csv
+```
+
+```text
+rate,hourly,weekly,monthly,yearly
+20.00,20.00,800.00,3466.67,41600.00
+25.00,25.00,1000.00,4333.33,52000.00
+```
+
+JSON output:
+
+```bash
+cargo run -- --rate 20,25 --hours 8 --format json
+```
+
+```json
+{
+  "schedule": {
+    "days_per_week": "5.00",
+    "weeks_per_year": "52.00",
+    "months_per_year": "12.00"
+  },
+  "results": [
+    {
+      "rate": "20.00",
+      "hourly": "20.00",
+      "weekly": "800.00",
+      "monthly": "3466.67",
+      "yearly": "41600.00"
+    },
+    {
+      "rate": "25.00",
+      "hourly": "25.00",
+      "weekly": "1000.00",
+      "monthly": "4333.33",
+      "yearly": "52000.00"
+    }
+  ]
+}
 ```
 
 ## Test

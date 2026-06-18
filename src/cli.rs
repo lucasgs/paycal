@@ -1,9 +1,16 @@
 use std::env;
 
-use clap::{error::ErrorKind, CommandFactory, Parser};
+use clap::{error::ErrorKind, CommandFactory, Parser, ValueEnum};
 use rust_decimal::Decimal;
 
 use crate::{PayInput, WorkSchedule};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum OutputFormat {
+    Table,
+    Csv,
+    Json,
+}
 
 #[derive(Debug, Clone, PartialEq, Parser)]
 #[command(
@@ -11,13 +18,15 @@ use crate::{PayInput, WorkSchedule};
     version,
     about = "CLI pay calculator",
     long_about = None,
-    after_help = "Examples:\n  paycal --rate 20 --hours 8\n  paycal --rate 20,25,30 --hours 8\n  paycal --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12\n  paycal 20,25 8\n  cargo run -- --rate 20,25,30 --hours 8"
+    after_help = "Examples:\n  paycal --rate 20 --hours 8\n  paycal --rate 20,25,30 --hours 8\n  paycal --rate 20,25 --hours 8 --days-per-week 4 --weeks-per-year 48 --months-per-year 12\n  paycal --rate 20,25 --hours 8 --format csv\n  paycal --rate 20,25 --hours 8 --format json\n  paycal 20,25 8\n  cargo run -- --rate 20,25,30 --hours 8"
 )]
 struct CliArgs {
     #[arg(long, value_name = "RATE[,RATE...]", allow_hyphen_values = true)]
     rate: Option<String>,
     #[arg(long = "hours", value_name = "HOURS_PER_DAY")]
     hours_per_day: Option<u8>,
+    #[arg(long, value_enum, default_value_t = OutputFormat::Table)]
+    format: OutputFormat,
     #[arg(
         long = "days-per-week",
         value_name = "DAYS",
@@ -58,6 +67,7 @@ pub enum CliAction {
     Calculate {
         inputs: Vec<PayInput>,
         schedule: WorkSchedule,
+        format: OutputFormat,
     },
 }
 
@@ -130,6 +140,7 @@ where
             weeks_per_year,
             months_per_year,
         },
+        format: parsed.format,
     })
 }
 
@@ -165,7 +176,7 @@ fn validate_positive_decimal(value: Decimal, name: &str) -> Result<(), String> {
 mod tests {
     use rust_decimal_macros::dec;
 
-    use super::{parse_args, CliAction};
+    use super::{parse_args, CliAction, OutputFormat};
     use crate::{PayInput, WorkSchedule};
 
     #[test]
@@ -265,6 +276,38 @@ mod tests {
                     },
                 ],
                 schedule: WorkSchedule::default(),
+                format: OutputFormat::Table,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_accepts_export_format() {
+        let action = parse_args([
+            "--rate".to_string(),
+            "20,25".to_string(),
+            "--hours".to_string(),
+            "8".to_string(),
+            "--format".to_string(),
+            "csv".to_string(),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            action,
+            CliAction::Calculate {
+                inputs: vec![
+                    PayInput {
+                        rate: dec!(20.0),
+                        hours_per_day: 8,
+                    },
+                    PayInput {
+                        rate: dec!(25.0),
+                        hours_per_day: 8,
+                    },
+                ],
+                schedule: WorkSchedule::default(),
+                format: OutputFormat::Csv,
             }
         );
     }
@@ -303,6 +346,7 @@ mod tests {
                     weeks_per_year: dec!(48.0),
                     months_per_year: dec!(12.0),
                 },
+                format: OutputFormat::Table,
             }
         );
     }
@@ -336,6 +380,7 @@ mod tests {
                     weeks_per_year: dec!(48.0),
                     months_per_year: dec!(12.0),
                 },
+                format: OutputFormat::Table,
             }
         );
     }
@@ -389,6 +434,8 @@ mod tests {
             "22.75,30.50".to_string(),
             "--hours".to_string(),
             "7".to_string(),
+            "--format".to_string(),
+            "json".to_string(),
         ])
         .unwrap();
 
@@ -406,6 +453,7 @@ mod tests {
                     },
                 ],
                 schedule: WorkSchedule::default(),
+                format: OutputFormat::Json,
             }
         );
     }
