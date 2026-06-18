@@ -30,34 +30,32 @@ fn main() -> ExitCode {
 }
 
 fn print_table(inputs: &[PayInput], schedule: WorkSchedule) {
-    println!("+----------+----------+----------+----------+----------+");
-    println!("| Rate     | Hourly   | Weekly   | Monthly  | Yearly   |");
-    println!("+----------+----------+----------+----------+----------+");
+    println!("+----------+----------+----------+----------+");
+    println!("| Rate     | Weekly   | Monthly  | Yearly   |");
+    println!("+----------+----------+----------+----------+");
 
     for input in inputs {
         let result = input.calculate_with_schedule(schedule);
         println!(
-            "| {:>8} | {:>8} | {:>8} | {:>8} | {:>8} |",
+            "| {:>8} | {:>8} | {:>8} | {:>8} |",
             format_money(input.rate),
-            format_money(result.hourly),
             format_money(result.weekly),
             format_money(result.monthly),
             format_money(result.yearly),
         );
     }
 
-    println!("+----------+----------+----------+----------+----------+");
+    println!("+----------+----------+----------+----------+");
 }
 
 fn print_csv(inputs: &[PayInput], schedule: WorkSchedule) {
-    println!("rate,hourly,weekly,monthly,yearly");
+    println!("rate,weekly,monthly,yearly");
 
     for input in inputs {
         let result = input.calculate_with_schedule(schedule);
         println!(
-            "{},{},{},{},{}",
+            "{},{},{},{}",
             format_money(input.rate),
-            format_money(result.hourly),
             format_money(result.weekly),
             format_money(result.monthly),
             format_money(result.yearly),
@@ -115,7 +113,6 @@ impl From<WorkSchedule> for JsonSchedule {
 #[derive(Serialize)]
 struct JsonRow {
     rate: String,
-    hourly: String,
     weekly: String,
     monthly: String,
     yearly: String,
@@ -125,7 +122,6 @@ impl JsonRow {
     fn from(input: PayInput, result: PayBreakdown) -> Self {
         Self {
             rate: format_money(input.rate),
-            hourly: format_money(result.hourly),
             weekly: format_money(result.weekly),
             monthly: format_money(result.monthly),
             yearly: format_money(result.yearly),
